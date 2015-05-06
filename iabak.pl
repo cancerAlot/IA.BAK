@@ -17,7 +17,7 @@ use CGI;
 use File::Slurp;
 
 
-# get("http://www.google.com") || die "Check your internet connection \n";
+get("http://www.google.com") || die "Check your internet connection \n";
 $|=1;
 
 
@@ -66,7 +66,7 @@ EOF
     }
 } else{
     my $localdir = randomnew();
-     if(length $localdir ==0){
+     unless($localdir){
         print "No new shrads are currently available. Please try again later!\n";
         exit 1;
      }
@@ -172,7 +172,7 @@ sub checkoutshard{
     copy "../id_rsa.pub", ".git/annex/id_rsa.pub";
     system("git remote add origin $repourl ; git config remove.origin.annex-ssh-options \"-i .git/annex/id_rsa\" ; git annex sync");
     chdir($top);
-    unless(length $prevshard == 0){
+    if($prevshard){
         for(qw (annex.diskreserve annex.web-options)){
             chdir($prevshard);
             my $val = `git config $_`;
@@ -351,7 +351,7 @@ sub checkupdate{
         get("https://downloads.kitenet.net/git-annex/OSX/current/10.10_Yosemite/git-annex.dmg.info") =~/.*distributionVersion = "(\d\.\d{8})".*/;
         $availVersion = $1;
     }
-    # f.e 5.20150420 (decimal)
+    return 1 unless($installedVersion); # return "yes, do update" if there is no installed version
     return $installedVersion < $availVersion;
 }
 
