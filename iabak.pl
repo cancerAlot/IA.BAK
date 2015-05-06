@@ -26,7 +26,7 @@ use Archive::Extract;
 use Cwd;
 use File::Basename;
 use List::Util qw (shuffle first);
-
+use CGI;
 
 # get("http://www.google.com") || die "Check your internet connection \n";
 $|=1;
@@ -111,15 +111,7 @@ sub changeEmail{
             chdir($_);
             my $uuid = `git config annex.uuid`;
             chdir("..");
-            open(PUB, "<", "id_rsa.pub");
-            my $pub = <PUB>;
-            close PUB;
-            # print Dumper $pub;
-            # print "\n\n";
-            my $cmd = "./register-helper.pl ". uc($_) ." ". $uuid . " ". $registrationemail . " " . $pub;
-            # print Dumper $cmd;
-            # print "\n\n";
-            get(`$cmd`);
+            register($_, $uuid, $registrationemail);
         }
     }
     print "\nYour email address should be updated now.\n";
@@ -225,19 +217,8 @@ sub checkssh{
     unless(`ssh -i id_rsa -o BatchMode=yes -o StrictHostKeyChecking=no "$user" git-annex-shell -c configlist $dir`){
         print "Seem you're not set up yet for access to $repourl yet. Let's fix that..\n";
 # TODO        
-        # wget -O- "$(./register-helper.pl "$SHARD" "$uuid" "$registrationemail" "$(cat id_rsa.pub)")"
         my @cmd;
-        open(PUB, "<", "id_rsa.pub");
-        my $pub = <PUB>;
-        chomp $pub;
-        @cmd = ("./register-helper.pl", uc($dir), $uuid, $registrationemail, lc($pub));
-        close PUB;
-
-        $cmd[4] =~ s/(\s)/\ /g;
-        chomp @cmd;
-        my @output = `@cmd`;
-        print Dumper @output;
-        # get($output);
+        register($dir, $uuid, $registrationemail);
         sleep 1;  #replace with 1
         get("http://iabak.archiveteam.org/cgi-bin/pushme.cgi");
         checkssh($repourl, $uuid);
@@ -395,31 +376,37 @@ sub checkupdate{
         $availVersion = $1;
     }
     # f.e 5.20150420 (decimal)
-    return $installedVersion<$availVersion;
+    return $installedVersion < $availVersion;
 }
 
 
-sub fakeTouch{
+sub fakeTouch {
     open(PRE, ">", shift);
     print PRE "";
     close PRE;
 }
 
+sub stillhavespace {
+    return 1;
+}
 
+sub register {
+    my ($shard, $uuid, $email, $pubkey) = @_;
+    unless ($pubkey) {
+        open(PUB, "<", "id_rsa.pub");
+        $pubkey = <PUB>;
+        close PUB;
+    }
+    chomp $pubkey;
+    $pubkey=~s/\+/_/g;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    my $q=CGI->new;
+    $q->param("shard", uc($shard));
+    $q->param("uuid", $uuid);
+    $q->param("email", $email);
+    $q->param("pubkey", $pubkey);
+    my $url=$q->self_url;
+    $url=~s!^http://localhost!http://iabak.archiveteam.org/cgi-bin/register.cgi!;
+    my $result = get($url);
+    # TODO: check the restult to make sure that the registration succeeded
+}
