@@ -1,18 +1,5 @@
 #!/bin/env perl
 
-# Q: what's this?
-# A: i started rewriting iabak.sh in perl because bash/bash-utils are not portable enough (coreutils vs bsdutils)
-#
-# Q: what's the state of this subproject?
-# A: there are still broken, untested and missing parts; not even alpha - this file is under heavy development!
-#
-# Q: what's missing?
-# A: proper OSX support in installgitannex; periodicsync; cronjob and some other parts
-#
-# Q: i'm still not satisfied
-# A: ask protodev on #internetarchive.bak EFnet
-
-
 use warnings;
 use strict;
 use diagnostics;
@@ -337,9 +324,6 @@ sub installgitannex{
             print "Installed in ". getcwd() . "/git-annex.linux\n\n";
         }
     }else{
-        # i'm fighting myself to support something like a bsd-fork
-        # not even providing proper coreutils - that's why i'm writing everything in perl
-        # ok, i should stop writing comments when i'm drunk
         if(-d "git-annex.osx"){
             unlink "git-annex.dmg";
             if($NEED_PRERELEASE == 1){
