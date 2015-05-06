@@ -14,6 +14,8 @@ use Cwd;
 use File::Basename;
 use List::Util qw (shuffle first);
 use CGI;
+use File::Slurp;
+
 
 # get("http://www.google.com") || die "Check your internet connection \n";
 $|=1;
@@ -89,9 +91,7 @@ EOF
 
 sub changeEmail{
     promptEmail();
-    open(FILE, "<", ".registrationemail");
-    my $registrationemail = <FILE>;
-    close FILE;
+	my $registrationemail = read_file(".registrationemail");
     for(glob("shard*")){
         if ( -d $_){
             print "Updating $_\n";
@@ -126,9 +126,7 @@ sub promptEmail{
         print "re-enter email address to verify> ";
         $e2 = <STDIN>;
         if($e1 eq $e2){
-            open(FILE, ">", ".registrationemail");
-            print FILE "$e1";
-            close FILE;
+            write_file(".registrationemail", $e1);            
         }else{
             print "Emails don't match! Try again..\n";
         }
@@ -150,9 +148,7 @@ sub checkoutshard{
     unless( -e ".registrationemail"){
         changeEmail();
     }
-    open(REG, "<", ".registrationemail");
-    my $registrationemail = <REG>;
-    close REG;
+    my $registrationemail = read_file(".registrationemail");  
 
     open(REP, "<", "repolist");
     my $l = (grep /$shard/, <REP>)[0];
@@ -213,9 +209,7 @@ sub checkssh{
 }
 
 sub randomnew{
-    open(REPO, "<", "repolist");
-    my @repos = <REPO>;
-    close REPO;
+    my @repos = read_file("repolist");    
     my @active = grep {/active$/} @repos;
     @active = (@active) ? @active : grep {/reserve$/} @repos ;
     my @existRepos;
@@ -230,8 +224,7 @@ sub randomnew{
 sub handleshard{
     my $shard = shift;
     print "\n========= $shard =========\n\n";
-    open (my $REP, "<", "repolist") || die "could not open repolist\n";
-    my @repos = <$REP>;
+    my @repos = read_file("repolist");
     my ($matched) = grep /^$shard/, @repos;
     $matched =~ /(\w+)$/;
     if($1=~"active"){
@@ -250,7 +243,6 @@ sub handleshard{
         print "Unknown state $1\n";
         exit 1;
     }
-    close $REP;
 }
 
 
@@ -365,9 +357,7 @@ sub checkupdate{
 
 
 sub fakeTouch {
-    open(PRE, ">", shift);
-    print PRE "";
-    close PRE;
+    write_file(shift, "");    
 }
 
 sub stillhavespace {
@@ -376,11 +366,7 @@ sub stillhavespace {
 
 sub register {
     my ($shard, $uuid, $email, $pubkey) = @_;
-    unless ($pubkey) {
-        open(PUB, "<", "id_rsa.pub");
-        $pubkey = <PUB>;
-        close PUB;
-    }
+    ($pubkey = read_file("id_rsa.pub")) unless ($pubkey);
     chomp $pubkey;
     $pubkey=~s/\+/_/g;
 
