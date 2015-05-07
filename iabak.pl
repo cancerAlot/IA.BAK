@@ -1,18 +1,5 @@
 #!/bin/env perl
 
-# Q: what's this?
-# A: i started rewriting iabak.sh in perl because bash/bash-utils are not portable enough (coreutils vs bsdutils)
-#
-# Q: what's the state of this subproject?
-# A: there are still broken, untested and missing parts; not even alpha - this file is under heavy development!
-#
-# Q: what's missing?
-# A: proper OSX support in installgitannex; periodicsync; cronjob and some other parts
-#
-# Q: i'm still not satisfied
-# A: ask protodev on #internetarchive.bak EFnet
-
-
 use warnings;
 use strict;
 use diagnostics;
@@ -27,8 +14,10 @@ use Cwd;
 use File::Basename;
 use List::Util qw (shuffle first);
 use CGI;
+use File::Slurp;
 
-# get("http://www.google.com") || die "Check your internet connection \n";
+
+get("http://www.google.com") || die "Check your internet connection \n";
 $|=1;
 
 
@@ -77,7 +66,7 @@ EOF
     }
 } else{
     my $localdir = randomnew();
-     if(length $localdir ==0){
+     unless($localdir){
         print "No new shrads are currently available. Please try again later!\n";
         exit 1;
      }
@@ -102,9 +91,7 @@ EOF
 
 sub changeEmail{
     promptEmail();
-    open(FILE, "<", ".registrationemail");
-    my $registrationemail = <FILE>;
-    close FILE;
+	my $registrationemail = read_file(".registrationemail");
     for(glob("shard*")){
         if ( -d $_){
             print "Updating $_\n";
@@ -139,9 +126,7 @@ sub promptEmail{
         print "re-enter email address to verify> ";
         $e2 = <STDIN>;
         if($e1 eq $e2){
-            open(FILE, ">", ".registrationemail");
-            print FILE "$e1";
-            close FILE;
+            write_file(".registrationemail", $e1);            
         }else{
             print "Emails don't match! Try again..\n";
         }
@@ -163,9 +148,7 @@ sub checkoutshard{
     unless( -e ".registrationemail"){
         changeEmail();
     }
-    open(REG, "<", ".registrationemail");
-    my $registrationemail = <REG>;
-    close REG;
+    my $registrationemail = read_file(".registrationemail");  
 
     open(REP, "<", "repolist");
     my $l = (grep /$shard/, <REP>)[0];
@@ -189,7 +172,7 @@ sub checkoutshard{
     copy "../id_rsa.pub", ".git/annex/id_rsa.pub";
     system("git remote add origin $repourl ; git config remove.origin.annex-ssh-options \"-i .git/annex/id_rsa\" ; git annex sync");
     chdir($top);
-    unless(length $prevshard == 0){
+    if($prevshard){
         for(qw (annex.diskreserve annex.web-options)){
             chdir($prevshard);
             my $val = `git config $_`;
@@ -226,9 +209,7 @@ sub checkssh{
 }
 
 sub randomnew{
-    open(REPO, "<", "repolist");
-    my @repos = <REPO>;
-    close REPO;
+    my @repos = read_file("repolist");    
     my @active = grep {/active$/} @repos;
     @active = (@active) ? @active : grep {/reserve$/} @repos ;
     my @existRepos;
@@ -243,8 +224,7 @@ sub randomnew{
 sub handleshard{
     my $shard = shift;
     print "\n========= $shard =========\n\n";
-    open (my $REP, "<", "repolist") || die "could not open repolist\n";
-    my @repos = <$REP>;
+    my @repos = read_file("repolist");
     my ($matched) = grep /^$shard/, @repos;
     $matched =~ /(\w+)$/;
     if($1=~"active"){
@@ -263,7 +243,6 @@ sub handleshard{
         print "Unknown state $1\n";
         exit 1;
     }
-    close $REP;
 }
 
 
@@ -337,9 +316,6 @@ sub installgitannex{
             print "Installed in ". getcwd() . "/git-annex.linux\n\n";
         }
     }else{
-        # i'm fighting myself to support something like a bsd-fork
-        # not even providing proper coreutils - that's why i'm writing everything in perl
-        # ok, i should stop writing comments when i'm drunk
         if(-d "git-annex.osx"){
             unlink "git-annex.dmg";
             if($NEED_PRERELEASE == 1){
@@ -375,15 +351,13 @@ sub checkupdate{
         get("https://downloads.kitenet.net/git-annex/OSX/current/10.10_Yosemite/git-annex.dmg.info") =~/.*distributionVersion = "(\d\.\d{8})".*/;
         $availVersion = $1;
     }
-    # f.e 5.20150420 (decimal)
+    return 1 unless($installedVersion); # return "yes, do update" if there is no installed version
     return $installedVersion < $availVersion;
 }
 
 
 sub fakeTouch {
-    open(PRE, ">", shift);
-    print PRE "";
-    close PRE;
+    write_file(shift, "");    
 }
 
 sub stillhavespace {
@@ -392,11 +366,7 @@ sub stillhavespace {
 
 sub register {
     my ($shard, $uuid, $email, $pubkey) = @_;
-    unless ($pubkey) {
-        open(PUB, "<", "id_rsa.pub");
-        $pubkey = <PUB>;
-        close PUB;
-    }
+    ($pubkey = read_file("id_rsa.pub")) unless ($pubkey);
     chomp $pubkey;
     $pubkey=~s/\+/_/g;
 
